@@ -1,53 +1,60 @@
-const { client } = require('../config/db')
+const { ObjectId } = require('mongodb');
+const {client} = require('../config/db')
+
+const db = client.db("todo-db");
+const collection = db.collection("todo");
 
 const getTodoModel = async () => {
-  const getQuery = 'SELECT * FROM todoschema.todo ORDER BY todo_id;'
-  const result = await client.query(getQuery)
-  if (result.rows) return result.rows
-  throw new Error('Failed to get todos')
+  const result = await collection.find().toArray();
+  console.log('getTodoModel: result ', result)
+  if (result) return result
 }
 
 // post all properties
 const createTodoModel = async (title, notes, dueDate, priority, isChecked) => {
-  console.log('createTodoModel : >>>>>>>>', title, notes, dueDate, priority, isChecked)
-  const createQuery = 'INSERT INTO todoschema.todo(title, notes, due_date, priority, is_checked ) VALUES($1, $2, $3, $4, $5) RETURNING *'
-  const values = [title, notes, dueDate, priority, isChecked]
-  const result = await client.query(createQuery, values)
+  // console.log('createTodoModel : >>>>>>>>', title, notes, dueDate, priority, isChecked)
+  const todo = {title, notes, dueDate, priority, isChecked}
+  console.log('createTodoModel: todo ', todo)
+  const result = await collection.insertOne(todo)
+
   console.log('createTodoModel: result ', result)
-  if (result.rowCount !== 1) throw new Error('Failed to create todo') //
-  return result.rows[0]
-  
+  if (!result.acknowledged) throw new Error('Failed to create todo') 
+  return result
 }
 
 // change for update
 const updateTodoModel = async (id, title, notes, dueDate, priority, isChecked) => {
-  const values = [id, title, notes, dueDate, priority, isChecked]
-  const updateQuery = 'UPDATE todoschema.todo SET  title = $2, notes = $3, due_date = $4, priority = $5, is_checked = $6 WHERE todo_id = $1 RETURNING *'
+  console.log('updateTodoModel:  id ', id)
+  const filter = {"_id" : new ObjectId(id)}
 
-  const result = await client.query(updateQuery, values)
-  if (result.rowCount !== 1) throw new Error('Failed to update todo') //
-  return result.rows[0]
-  
+  const result = await collection.updateOne(filter, 
+    {$set:{title:title, notes:notes, due_date:dueDate, priority:priority, is_checked:isChecked}}
+);
+console.log('updateTodoModel:  result', result)
+  if(result.modifiedCount === 0) throw new Error('Failed to update todo') //
+  return result
 }
 
 const deleteTodoModel = async (id) => {
-  const deleteQuery = `DELETE FROM todoschema.todo
-    WHERE todo_id = ${id};`
-  const result = await client.query(deleteQuery)
-  console.log('deleteTodoModel: result ', result)
-  if (result.rowCount !== 1) throw new Error('Failed to delete todo') //
-  return result.rowCount
-  // return result.rowCount // throw error
+
+  const filter = {"_id" : new ObjectId(id)}
   
+    const result = await collection.deleteOne( filter );
+    console.log('deleteTodoModel:  result', result)
+    
+    console.log('deleteTodoModel:  result', result)
+    if(result.deletedCount === 0) throw new Error("Failed to delete todo")
+    return result
 }
 
 const getTodoByIdTodo = async (id) => {
-  const getByIdQuery = `SELECT FROM todoschema.todo
-    WHERE todo_id = ${id};`
-  const result = await client.query(getByIdQuery)
-  if (result.rowCount !== 1) throw new Error('Resource not found') //
-  // console.log('getTodoByIdTodo', result)
-  return result.rowCount
+  
+  const filter = {"_id" : new ObjectId(id)}
+
+  const result = await collection.find(filter).toArray
+  console.log('getTodoByIdTodo: result ', result)
+  if (result) return result
+  
 }
 
 const showDoneModel = async () => {
